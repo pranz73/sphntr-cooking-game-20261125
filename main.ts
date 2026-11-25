@@ -1,27 +1,23 @@
-// Warung Senja — entrypoint the grader runs with Node 22.
-// Copies game/ and screenshots/ into the output directory and writes
-// /output/dossier.json with buildDossier from vendor/makefun-game.ts.
-// Outside the grader, MAKEFUN_OUTPUT_DIR stands in for /output.
+// Warung Senja — entrypoint (Node 22, no build step).
+// Stage the game and its screenshots into the output directory, then write the dossier.
+import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { buildDossier } from "./vendor/makefun-game.ts";
 
-import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { buildDossier } from './vendor/makefun-game.ts';
+const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+const repoRoot = new URL('.', import.meta.url).pathname;
 
-const root = dirname(fileURLToPath(new URL('./main.ts', import.meta.url)));
-const out = resolve(process.env.MAKEFUN_OUTPUT_DIR ?? '/output');
+mkdirSync(outDir, { recursive: true });
+for (const folder of ['game', 'screenshots']) {
+  const src = join(repoRoot, folder);
+  if (existsSync(src)) cpSync(src, join(outDir, folder), { recursive: true });
+}
 
-mkdirSync(out, { recursive: true });
-cpSync(join(root, 'game'), join(out, 'game'), { recursive: true });
-cpSync(join(root, 'screenshots'), join(out, 'screenshots'), { recursive: true });
-writeFileSync(
-  join(out, 'dossier.json'),
-  buildDossier(out, {
-    text_max_bytes: 163840,
-    screenshots: { max: 4, max_bytes: 262144 },
-    game_max_files: 993,
-    game_max_bytes: 50331648,
-  }),
-);
-
-console.log('Wrote ' + out + '/dossier.json');
+const caps = {
+  text_max_bytes: 160 * 1024,
+  screenshots: { max: 4, max_bytes: 256 * 1024 },
+  game_max_files: 1000 - 7,
+  game_max_bytes: 48 * 1024 * 1024,
+};
+writeFileSync(join(outDir, 'dossier.json'), buildDossier(outDir, caps));
+console.log('dossier written to ' + join(outDir, 'dossier.json'));
